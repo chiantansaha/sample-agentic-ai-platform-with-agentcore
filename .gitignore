@@ -1,0 +1,172 @@
+# Documentation and commands
+commands.md
+
+# Kiro plans
+.kiro/plans/
+
+# SSH Keys
+*.pem
+*.key
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules/
+**/node_modules/
+jspm_packages/
+bower_components/
+
+# Build outputs
+dist
+dist-ssr
+build
+*.tar.gz
+out/
+target/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging
+*.local
+# Note: .env.development and .env.production are tracked for CI/CD
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.temp/
+tmp/
+temp/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# AI/ML specific
+*.model
+*.pkl
+*.h5
+*.pb
+checkpoints/
+models/
+data/
+datasets/
+*.csv
+*.json.gz
+*.parquet
+
+# AI Assistant specific
+.amazonq/
+.claude/
+.aws/
+credentials
+config
+CLAUDE.md
+
+# Obsidian
+.obsidian/
+
+# Documentation build
+docs/_build/
+site/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+
+# DynamoDB Local
+dynamodb-data/
+
+# Lambda build artifacts (zip files are built during deployment)
+apps/backend/lambda/layer/python/
+apps/backend/lambda/**/*.zip

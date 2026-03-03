@@ -1,0 +1,40 @@
+# FastAPI and server
+fastapi==0.115.0
+uvicorn[standard]==0.38.0
+pydantic==2.12.5
+pydantic-settings==2.6.0
+
+# AWS SDK - tested compatible versions (boto3 1.41.4+ includes AgentCore)
+boto3==1.41.4
+
+# Template engine (for code generation)
+Jinja2==3.1.4
+
+# OpenSearch
+opensearch-py==2.4.2
+
+# Database (for future use)
+sqlalchemy==2.0.36
+alembic==1.13.3
+asyncpg==0.30.0
+
+# HTTP client
+httpx==0.28.1
+requests==2.32.3
+
+# Validation and utilities
+python-multipart==0.0.12
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# CORS
+python-dotenv==1.2.1  # Required by fastmcp>=1.1.0
+
+# MCP (Model Context Protocol) - pinned versions for compatibility
+mcp==1.22.0
+fastmcp==2.13.3
+mcp-proxy-for-aws==1.1.4
+
+# Strands Agents - pinned versions
+strands-agents==1.18.0
+strands-agents-tools

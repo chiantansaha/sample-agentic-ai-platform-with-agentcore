@@ -1,0 +1,35 @@
+# Frontend Development Dockerfile (Monorepo 지원)
+FROM node:20-alpine
+
+# pnpm 설치
+RUN npm install -g pnpm@8
+
+# 작업 디렉터리 설정
+WORKDIR /app
+
+# 루트 package.json과 pnpm-workspace.yaml 복사
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+
+# packages 폴더 복사 (workspace 의존성)
+COPY packages ./packages
+
+# frontend package.json 복사
+COPY apps/frontend/package.json ./apps/frontend/
+
+# 의존성 설치
+RUN pnpm install
+
+# Create non-root user
+RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup \
+    && chown -R appuser:appgroup /app
+
+USER appuser
+
+# 소스 코드는 volume mount로 처리
+# (개발 시 hot reload를 위해)
+
+# 포트 노출
+EXPOSE 5173
+
+# 개발 서버 실행 (command는 docker-compose.yml에서 오버라이드)
+CMD ["pnpm", "dev:frontend"]

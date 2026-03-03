@@ -1,0 +1,86 @@
+"""Knowledge Base Retrieval Tools
+
+Generated KB Tools for Agent using Strands @tool decorator
+"""
+import os
+import logging
+import boto3
+from typing import List, Callable
+
+from strands import tool
+
+logger = logging.getLogger(__name__)
+
+# Bedrock Agent Runtime Client
+_bedrock_agent = boto3.client(
+    'bedrock-agent-runtime',
+    region_name='{{ aws_region }}'
+)
+
+{% for kb in knowledge_bases %}
+@tool(name="retrieve_from_{{ (kb.name or kb.id) | replace('-', '_') }}")
+def retrieve_from_{{ (kb.name or kb.id) | replace('-', '_') }}(query: str, num_results: int = 5) -> str:
+    """Search and retrieve relevant documents from Knowledge Base '{{ kb.name or kb.id }}'.
+
+    Use this tool when you need to find information from the knowledge base.
+    The tool will return relevant document excerpts with their sources.
+
+    Args:
+        query: Natural language search query describing what information you need
+        num_results: Number of results to return (default: 5)
+    """
+    kb_id = "{{ kb.knowledge_base_id }}"
+    try:
+        response = _bedrock_agent.retrieve(
+            knowledgeBaseId=kb_id,
+            retrievalQuery={
+                'text': query
+            },
+            retrievalConfiguration={
+                'vectorSearchConfiguration': {
+                    'numberOfResults': num_results
+                }
+            }
+        )
+
+        # Parse results
+        results = []
+        for item in response.get('retrievalResults', []):
+            content = item.get('content', {}).get('text', '')
+            score = item.get('score', 0)
+            location = item.get('location', {})
+
+            results.append({
+                'content': content,
+                'score': score,
+                'source': location.get('s3Location', {}).get('uri', 'unknown')
+            })
+
+        if not results:
+            return "No relevant documents found."
+
+        # Format results
+        formatted = []
+        for i, r in enumerate(results, 1):
+            formatted.append(f"[{i}] (Score: {r['score']:.2f})\n{r['content']}\nSource: {r['source']}")
+
+        return "\n\n---\n\n".join(formatted)
+
+    except Exception as e:
+        logger.error(f"KB retrieve error for {kb_id}: {e}")
+        # 예외를 발생시켜 toolResult status가 'error'로 설정되도록 함
+        raise RuntimeError(f"KB retrieve failed: {str(e)}")
+
+{% endfor %}
+
+def get_kb_tools() -> List[Callable]:
+    """Get list of KB retrieval tools.
+
+    Returns:
+        List of tool functions decorated with @tool
+    """
+    return [
+        {% for kb in knowledge_bases %}
+        retrieve_from_{{ (kb.name or kb.id) | replace('-', '_') }},
+        {% endfor %}
+    ]

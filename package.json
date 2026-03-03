@@ -1,0 +1,33 @@
+{
+  "name": "agentic-ai-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agentic AI Platform - Monorepo",
+  "scripts": {
+    "predev": "cd apps/backend && python3 -m pip install -r requirements.txt",
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"bgBlue.bold,bgMagenta.bold\" \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:backend": "cd apps/backend && ENV_MODE=development uvicorn app.main:app --reload --log-level debug",
+    "build:frontend": "pnpm --filter frontend build",
+    "build:backend": "cd apps/backend && docker build -t agentic-ai-backend .",
+    "test:frontend": "pnpm --filter frontend test",
+    "test:backend": "cd apps/backend && pytest",
+    "lint:frontend": "pnpm --filter frontend lint",
+    "lint:backend": "cd apps/backend && ruff check app/",
+    "type-check": "pnpm --filter \"@agentic-ai/*\" type-check",
+    "install:backend": "cd apps/backend && pip install -r requirements.txt",
+    "generate-types": "./scripts/generate-types.sh"
+  },
+  "keywords": [
+    "agentic-ai",
+    "monorepo",
+    "fastapi",
+    "react"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "concurrently": "^9.2.1"
+  }
+}

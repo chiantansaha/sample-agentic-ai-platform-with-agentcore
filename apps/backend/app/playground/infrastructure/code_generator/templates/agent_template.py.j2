@@ -1,0 +1,499 @@
+"""Generated Agent for AgentCore Runtime
+
+Agent: {{ agent_name }}
+Version: {{ agent_version }}
+Generated at: {{ generated_at }}
+
+This agent exposes:
+- /invocations (POST): Agent invocation endpoint
+- /ping (GET): Health check endpoint
+"""
+{% if local_testing %}
+# =============================================================================
+# OpenTelemetry Workaround (LOCAL TESTING ONLY)
+# =============================================================================
+# This workaround is ONLY needed for local testing (python agent.py).
+# When deployed to AgentCore Runtime, OpenTelemetry is automatically configured
+# via entryPoint: ['opentelemetry-instrument', 'agent.py'] - no code workaround needed.
+#
+# The workaround fixes contextvars issue that occurs when running locally
+# without the opentelemetry-instrument wrapper.
+# =============================================================================
+import sys
+import contextvars
+import types
+
+# Create a complete OpenTelemetry context implementation
+class _ContextKey:
+    """Simple context key implementation."""
+    __slots__ = ("name",)
+    def __init__(self, name):
+        self.name = name
+    def __repr__(self):
+        return f"_ContextKey({self.name!r})"
+
+class _Context(dict):
+    """Simple context implementation as a dict."""
+    pass
+
+_DEFAULT_CONTEXT = _Context()
+_CONTEXT_KEY = contextvars.ContextVar("otel_context", default=_DEFAULT_CONTEXT)
+
+def _create_key(name):
+    """Create a new context key."""
+    return _ContextKey(name)
+
+def _get_value(key, context=None):
+    """Get a value from the context."""
+    ctx = context if context is not None else _CONTEXT_KEY.get()
+    if ctx is None:
+        return None
+    return ctx.get(key)
+
+def _set_value(key, value, context=None):
+    """Set a value in a new context."""
+    ctx = context if context is not None else _CONTEXT_KEY.get()
+    new_ctx = _Context(ctx) if ctx else _Context()
+    new_ctx[key] = value
+    return new_ctx
+
+def _get_current():
+    """Get the current context."""
+    return _CONTEXT_KEY.get()
+
+def _attach(ctx):
+    """Attach a context."""
+    return _CONTEXT_KEY.set(ctx)
+
+def _detach(token):
+    """Detach a context using the token."""
+    _CONTEXT_KEY.reset(token)
+
+# Create fake opentelemetry.context module
+_fake_context = types.ModuleType("opentelemetry.context")
+_fake_context._RUNTIME_CONTEXT = None  # Not needed with this approach
+_fake_context.create_key = _create_key
+_fake_context.get_value = _get_value
+_fake_context.set_value = _set_value
+_fake_context.get_current = _get_current
+_fake_context.attach = _attach
+_fake_context.detach = _detach
+_fake_context.Context = _Context
+
+# Also create parent module if needed
+if "opentelemetry" not in sys.modules:
+    _fake_otel = types.ModuleType("opentelemetry")
+    sys.modules["opentelemetry"] = _fake_otel
+sys.modules["opentelemetry.context"] = _fake_context
+{% endif %}
+
+import os
+import re
+import json
+import copy
+import logging
+from typing import Dict, Any
+from datetime import datetime
+
+{% if not local_testing %}
+from bedrock_agentcore.runtime import BedrockAgentCoreApp
+{% endif %}
+from strands import Agent
+from strands.models.bedrock import BedrockModel
+{% if has_session_manager %}
+from strands.session import S3SessionManager
+{% endif %}
+
+{% if has_tools %}
+# Strands Community Tools
+from strands_tools import {{ tools | join(', ') }}
+{% endif %}
+
+{% if mcp_servers %}
+# MCP (Model Context Protocol) Integration
+from mcp.types import Tool as MCPTool
+from strands.tools.mcp import MCPClient
+from strands.tools.mcp.mcp_agent_tool import MCPAgentTool
+{% for server in mcp_servers %}
+{% if server.transport == 'http' %}
+{% if server.auth_type == 'iam' %}
+from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
+{% else %}
+from mcp.client.streamable_http import streamablehttp_client
+{% endif %}
+{% elif server.transport == 'sse' %}
+from mcp.client.sse import sse_client
+{% elif server.transport == 'stdio' %}
+from mcp import stdio_client, StdioServerParameters
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if knowledge_bases %}
+# KB Tools
+from kb_tools import get_kb_tools
+{% endif %}
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+{% if not local_testing %}
+# Initialize BedrockAgentCoreApp
+app = BedrockAgentCoreApp()
+{% endif %}
+
+{% if mcp_servers %}
+# =============================================================================
+# sanitize_mcp_tool_spec - Bedrock Converse API 호환성을 위한 tool_spec 수정
+# =============================================================================
+_VALID_KEY_PATTERN = re.compile(r'^[a-zA-Z0-9_.-]+$')
+
+def _sanitize_key(key: str) -> str:
+    """^[a-zA-Z0-9_.-]{1,64} 패턴에 맞게 변환"""
+    if _VALID_KEY_PATTERN.match(key) and len(key) <= 64:
+        return key
+    return re.sub(r'[^a-zA-Z0-9_.-]', '_', str(key))[:64]
+
+def _sanitize_schema(schema: dict, tool_name: str) -> dict:
+    """JSON Schema의 properties 키를 sanitize"""
+    if not isinstance(schema, dict):
+        return schema
+
+    # Deep copy로 완전히 독립적인 스키마 생성
+    result = copy.deepcopy(schema)
+    if "properties" in result and isinstance(result["properties"], dict):
+        sanitized_props = {}
+        for prop_key, prop_value in result["properties"].items():
+            # 각 property key를 상세히 로깅
+            key_str = str(prop_key)
+            key_len = len(key_str)
+            pattern_match = _VALID_KEY_PATTERN.match(key_str)
+            is_valid = pattern_match and key_len <= 64
+
+            logger.info(
+                f"[sanitize_mcp_tool] Tool '{tool_name}' property: "
+                f"key='{prop_key}' | len={key_len} | pattern_match={bool(pattern_match)} | valid={is_valid}"
+            )
+
+            sanitized_key = _sanitize_key(prop_key)
+            if sanitized_key != prop_key:
+                logger.warning(
+                    f"[sanitize_mcp_tool] Tool '{tool_name}' SANITIZED: "
+                    f"'{prop_key}' -> '{sanitized_key}'"
+                )
+            sanitized_props[sanitized_key] = prop_value
+        result["properties"] = sanitized_props
+
+        # required 배열도 매핑
+        if "required" in result and isinstance(result["required"], list):
+            result["required"] = [_sanitize_key(k) for k in result["required"]]
+
+    return result
+
+def sanitize_mcp_tool_spec(mcp_tool):
+    """새로운 MCPAgentTool 인스턴스를 sanitized inputSchema로 생성하여 반환
+
+    Bedrock Converse API 제약사항:
+    - inputSchema.properties 키가 ^[a-zA-Z0-9_.-]{1,64} 패턴과 일치해야 함
+
+    중요: Gateway prefix ('{target_name}___')는 유지해야 함!
+    - Gateway는 이 prefix를 사용하여 tools/call을 올바른 target으로 라우팅
+    - prefix를 제거하면 Gateway가 "Unknown tool" 에러 반환
+
+    이 함수는:
+    1. inputSchema의 properties 키를 sanitize
+    2. 새로운 MCPTool/MCPAgentTool 객체를 생성하여 반환 (도구 이름은 그대로 유지)
+
+    Args:
+        mcp_tool: 원본 MCPAgentTool 인스턴스
+
+    Returns:
+        MCPAgentTool: sanitized inputSchema를 가진 새 인스턴스 (도구 이름 유지)
+    """
+    try:
+        tool_name = mcp_tool.tool_name
+        original_mcp_tool = mcp_tool.mcp_tool  # mcp.types.Tool 객체
+        original_name = original_mcp_tool.name  # Gateway prefix 포함된 원본 이름 유지
+
+        logger.info(f"[sanitize_mcp_tool] Tool '{tool_name}' BEFORE: inputSchema={original_mcp_tool.inputSchema}")
+
+        # inputSchema가 없거나 비어있으면 원본 그대로 반환
+        if not original_mcp_tool.inputSchema:
+            logger.info(f"[sanitize_mcp_tool] Tool '{tool_name}' no inputSchema, returning as-is")
+            return mcp_tool
+
+        # inputSchema sanitize (properties 키만 sanitize, 도구 이름은 유지)
+        sanitized_input_schema = _sanitize_schema(
+            original_mcp_tool.inputSchema,
+            tool_name
+        )
+
+        logger.info(f"[sanitize_mcp_tool] Tool '{tool_name}' AFTER: inputSchema={sanitized_input_schema}")
+
+        # 새 MCPTool 생성 (원본 이름 유지 + sanitized inputSchema)
+        sanitized_mcp_tool = MCPTool(
+            name=original_name,  # ⭐ Gateway prefix 유지! (라우팅에 필요)
+            title=getattr(original_mcp_tool, 'title', None),
+            description=original_mcp_tool.description,
+            inputSchema=sanitized_input_schema,  # ⭐ sanitized!
+            outputSchema=getattr(original_mcp_tool, 'outputSchema', None),
+        )
+
+        # 새 MCPAgentTool 생성 (원본 이름 유지)
+        sanitized_agent_tool = MCPAgentTool(
+            mcp_tool=sanitized_mcp_tool,
+            mcp_client=mcp_tool.mcp_client,
+            name_override=original_name,  # ⭐ Gateway prefix 유지!
+            timeout=mcp_tool.timeout
+        )
+
+        logger.info(f"[sanitize_mcp_tool] Tool '{tool_name}' sanitized (name preserved: '{original_name}')")
+        return sanitized_agent_tool
+
+    except Exception as e:
+        logger.error(f"[sanitize_mcp_tool] Failed to sanitize tool: {e}", exc_info=True)
+        # 에러 시 원본 반환
+        return mcp_tool
+{% endif %}
+
+# Agent Configuration
+AGENT_CONFIG = {
+    "model_id": "{{ model_id }}",
+    "temperature": {{ temperature }},
+    "max_tokens": {{ max_tokens }},
+    "system_prompt": """{{ system_prompt | replace('"', '\\"') | replace('\n', '\\n') }}"""
+}
+
+# Session S3 Configuration
+SESSION_BUCKET = os.environ.get("SESSION_BUCKET", "{{ session_bucket }}")
+SESSION_PREFIX = os.environ.get("SESSION_PREFIX", "{{ session_prefix }}")
+
+{% if mcp_servers %}
+# MCP Server Clients
+# Note: MCPClient implements ToolProvider interface for automatic lifecycle management
+# MCP clients are loaded lazily to handle connection failures gracefully
+_mcp_clients = []
+
+def _init_mcp_clients():
+    """Initialize MCP clients with error handling for connection failures"""
+    clients = []
+{% for server in mcp_servers %}
+    try:
+{% if server.transport == 'http' %}
+{% if server.auth_type == 'iam' %}
+        # AWS IAM authenticated MCP client (uses Runtime's IAM role)
+        # Note: prefix removed to keep tool names short (Bedrock 64 char limit)
+        _mcp_{{ server.name }} = MCPClient(
+            lambda: aws_iam_streamablehttp_client(
+                endpoint="{{ server.url }}",
+                aws_region=os.environ.get("AWS_REGION", "{{ server.aws_region | default(aws_region) }}"),
+                aws_service="bedrock-agentcore"
+            )
+        )
+{% else %}
+        # Standard HTTP MCP client (OAuth/API Key via headers)
+        # Note: prefix removed to keep tool names short (Bedrock 64 char limit)
+        _mcp_{{ server.name }} = MCPClient(
+            lambda: streamablehttp_client(
+                url="{{ server.url }}"{% if server.headers %},
+                headers={{ server.headers }}{% endif %}
+            )
+        )
+{% endif %}
+{% elif server.transport == 'sse' %}
+        # Note: prefix removed to keep tool names short (Bedrock 64 char limit)
+        _mcp_{{ server.name }} = MCPClient(
+            lambda: sse_client("{{ server.url }}")
+        )
+{% elif server.transport == 'stdio' %}
+        # Note: prefix removed to keep tool names short (Bedrock 64 char limit)
+        _mcp_{{ server.name }} = MCPClient(
+            lambda: stdio_client(
+                StdioServerParameters(
+                    command="{{ server.command }}",
+                    args={{ server.args | default([]) }}
+                )
+            )
+        )
+{% endif %}
+        # Start the MCP client to establish connection
+        _mcp_{{ server.name }}.start()
+        clients.append(_mcp_{{ server.name }})
+        logger.info("MCP client initialized and started: {{ server.name }}")
+        # Debug: Check if tools are available
+        try:
+            tools = _mcp_{{ server.name }}.list_tools_sync()
+            tool_count = len(tools) if tools else 0
+            tool_names = [t.tool_name for t in tools] if tools else []
+            logger.info(f"MCP '{{ server.name }}' tools loaded: {tool_count} tools - {tool_names}")
+        except Exception as tool_err:
+            logger.warning(f"Failed to list tools for '{{ server.name }}': {tool_err}")
+    except Exception as e:
+        logger.error(f"Failed to initialize MCP client '{{ server.name }}': {e}", exc_info=True)
+{% endfor %}
+    return clients
+
+# Initialize MCP clients (failures are logged but don't stop agent creation)
+try:
+    _mcp_clients = _init_mcp_clients()
+except Exception as e:
+    logger.warning(f"Error during MCP client initialization: {e}")
+    _mcp_clients = []
+{% endif %}
+
+# Agent instance cache
+_agent_cache: Dict[str, Agent] = {}
+
+
+def get_or_create_agent(session_id: str = None) -> Agent:
+    """Agent 인스턴스 가져오기 또는 생성"""
+    cache_key = session_id or "default"
+
+    if cache_key in _agent_cache:
+        return _agent_cache[cache_key]
+
+    # Model
+    model = BedrockModel(
+        model_id=AGENT_CONFIG["model_id"],
+        temperature=AGENT_CONFIG["temperature"],
+        max_tokens=AGENT_CONFIG["max_tokens"]
+    )
+
+    # Tools Collection
+    tools = []
+
+    {% if has_tools %}
+    # Add Strands Community Tools
+    tools.extend([{{ tools | join(', ') }}])
+    {% endif %}
+
+    {% if knowledge_bases %}
+    # Add KB tools
+    kb_tools = get_kb_tools()
+    tools.extend(kb_tools)
+    {% endif %}
+
+    {% if mcp_servers %}
+    # Add MCP tools (extracted from MCP clients)
+    # MCP clients are already started in _init_mcp_clients()
+    # Sanitize tool_spec for Bedrock Converse API compatibility
+    for mcp_client in _mcp_clients:
+        try:
+            # Extract individual tools from MCP client
+            mcp_tools = mcp_client.list_tools_sync()
+            if mcp_tools:
+                # Sanitize each tool and create new instances (list comprehension)
+                logger.info(f"[MCP] Processing {len(mcp_tools)} tools for sanitization")
+                sanitized_tools = [sanitize_mcp_tool_spec(tool) for tool in mcp_tools]
+
+                # 디버깅: 각 도구 로깅
+                for idx, tool in enumerate(sanitized_tools):
+                    logger.info(f"[MCP] Tool {idx}: {tool.tool_name} (sanitized)")
+
+                tools.extend(sanitized_tools)
+                logger.info(f"Added {len(sanitized_tools)} MCP tools (sanitized)")
+            else:
+                logger.warning(f"MCP client returned no tools")
+        except Exception as e:
+            logger.warning(f"Failed to get tools from MCP client: {e}")
+    {% endif %}
+
+    {% if has_session_manager %}
+    # Session Manager
+    session_manager = None
+    if session_id and SESSION_BUCKET:
+        session_manager = S3SessionManager(
+            session_id=session_id,
+            bucket=SESSION_BUCKET,
+            prefix=SESSION_PREFIX
+        )
+    {% endif %}
+
+    # Create Agent with all loaded tools
+    logger.info(f"Creating agent with {len(tools)} tools")
+    agent = Agent(
+        model=model,
+        tools=tools if tools else None,
+        system_prompt=AGENT_CONFIG["system_prompt"],
+        {% if has_session_manager %}
+        session_manager=session_manager
+        {% endif %}
+    )
+
+    # Log actual tool specs that will be sent to Bedrock
+    logger.info("=" * 80)
+    logger.info("[BEDROCK] Tool specs that will be sent to LLM:")
+    all_tools_config = agent.tool_registry.get_all_tools_config()
+    for tool_name, tool_spec in all_tools_config.items():
+        logger.info(f"  Tool: {tool_name}")
+        input_schema = tool_spec.get("inputSchema", {})
+        if "json" in input_schema:
+            properties = input_schema["json"].get("properties", {})
+            if properties:
+                logger.info(f"    Properties: {list(properties.keys())}")
+        logger.info(f"    Full inputSchema: {input_schema}")
+    logger.info("=" * 80)
+
+    _agent_cache[cache_key] = agent
+    return agent
+
+
+{% if not local_testing %}
+@app.entrypoint
+async def invoke(payload: Dict[str, Any], context: Any = None):
+    """Agent invocation endpoint (streaming)
+
+    This is called when POST /invocations is hit.
+    Based on: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/response-streaming.html
+
+    Args:
+        payload: Request payload with:
+            - prompt (str): User message (required)
+        context: AgentCore runtime context (includes runtimeSessionId)
+
+    Yields:
+        Streaming response chunks from the agent
+    """
+    logger.info(f"Received invocation: {json.dumps(payload)}")
+
+    prompt = payload.get("prompt", "")
+
+    # Get session_id from context or payload
+    session_id = None
+    if context and hasattr(context, 'session_id'):
+        session_id = context.session_id
+    elif context and hasattr(context, 'runtime_session_id'):
+        session_id = context.runtime_session_id
+    elif context and hasattr(context, 'runtimeSessionId'):
+        session_id = context.runtimeSessionId
+
+    # Fallback: session_id가 payload에 있을 수도 있음
+    if not session_id:
+        session_id = payload.get("session_id") or payload.get("runtimeSessionId")
+
+    logger.info(f"Session ID: {session_id} (from {'context' if session_id and context else 'payload or None'})")
+
+    if not prompt:
+        yield ({"type": "error", "content": "prompt is required"})
+        return
+
+    try:
+        # Get or create agent
+        agent = get_or_create_agent(session_id)
+
+        # Stream response from agent (AWS docs pattern)
+        stream = agent.stream_async(prompt)
+        async for event in stream:
+            logger.debug(f"Streaming event: {event}")
+            yield (event)
+
+    except Exception as e:
+        logger.error(f"Agent invocation error: {e}", exc_info=True)
+        yield ({"type": "error", "content": str(e)})
+
+
+# For local testing and running the server
+if __name__ == "__main__":
+    # app.run() starts the FastAPI server with /invocations and /ping endpoints
+    app.run()
+{% endif %}

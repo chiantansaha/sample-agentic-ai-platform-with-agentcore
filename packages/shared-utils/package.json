@@ -1,0 +1,5 @@
+{
+  "name": "@agentic-ai/shared-utils",
+  "version": "0.1.0",
+  "main": "src/index.ts"
+}

@@ -1,0 +1,3 @@
+# Lambda Layer Dependencies for Knowledge Base Integration
+opensearch-py==3.1.0
+requests-aws4auth==1.3.1

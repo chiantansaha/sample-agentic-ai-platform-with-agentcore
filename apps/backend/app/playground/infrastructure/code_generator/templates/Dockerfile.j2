@@ -1,0 +1,67 @@
+# Generated Dockerfile for AgentCore Runtime (Container Deployment)
+# Agent: {{ agent_name }}
+# Version: {{ agent_version }}
+# Generated at: {{ generated_at }}
+#
+# Build: docker build --platform linux/arm64 -t {{ image_name }}:{{ image_tag }} .
+# Test:  docker run --platform linux/arm64 -p 8080:8080 {{ image_name }}:{{ image_tag }}
+
+# =============================================================================
+# IMPORTANT: AgentCore Runtime requires ARM64 architecture
+# Using custom base image with pre-installed common dependencies
+# =============================================================================
+{% if base_image_uri %}
+FROM {{ base_image_uri }}
+{% else %}
+FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:{{ python_version }}-slim
+
+# Install system dependencies (fallback for local builds)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+{% endif %}
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first (for Docker layer caching)
+COPY requirements.txt .
+
+# Install additional Python dependencies (agent-specific only)
+RUN if [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+
+# Copy application code
+COPY agent.py .
+{% if knowledge_bases %}
+COPY kb_tools.py .
+{% endif %}
+{% if additional_files %}
+{% for file in additional_files %}
+COPY {{ file }} .
+{% endfor %}
+{% endif %}
+
+# Expose port (AgentCore Runtime expects 8080)
+EXPOSE 8080
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+{% if environment_variables %}
+{% for key, value in environment_variables.items() %}
+ENV {{ key }}="{{ value }}"
+{% endfor %}
+{% endif %}
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/ping || exit 1
+
+# Run the agent with OpenTelemetry auto-instrumentation
+# AgentCore Runtime SDK provides /invocations and /ping endpoints
+{% if enable_otel %}
+CMD ["opentelemetry-instrument", "python", "agent.py"]
+{% else %}
+CMD ["python", "agent.py"]
+{% endif %}

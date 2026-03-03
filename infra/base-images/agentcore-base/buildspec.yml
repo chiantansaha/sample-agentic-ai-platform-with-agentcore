@@ -1,0 +1,35 @@
+version: 0.2
+
+# Base Image Build Spec
+# Builds the custom agentcore-base image with pre-installed dependencies
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo "Base image build started on $(date)"
+      - echo "Image Tag - $IMAGE_TAG"
+
+      # Docker Buildx 및 QEMU 설정 (ARM64 크로스 빌드)
+      - echo "Setting up Docker Buildx for ARM64..."
+      - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+      - docker buildx create --use --name arm64-builder --driver docker-container
+      - docker buildx inspect --bootstrap
+
+  build:
+    commands:
+      - echo "Building ARM64 base image with Buildx..."
+      - docker buildx build --platform linux/arm64 --load -t $ECR_REPOSITORY_URL:$IMAGE_TAG .
+      - echo "Tagging as latest..."
+      - docker tag $ECR_REPOSITORY_URL:$IMAGE_TAG $ECR_REPOSITORY_URL:latest
+      - echo "Build completed on $(date)"
+
+  post_build:
+    commands:
+      - echo "Pushing base image to ECR..."
+      - docker push $ECR_REPOSITORY_URL:$IMAGE_TAG
+      - docker push $ECR_REPOSITORY_URL:latest
+      - echo "Push completed on $(date)"
+      - echo "Base Image URI - $ECR_REPOSITORY_URL:$IMAGE_TAG"
+      - echo "Base Image URI (latest) - $ECR_REPOSITORY_URL:latest"

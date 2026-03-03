@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2563eb"/>
+      <stop offset="100%" style="stop-color:#4338ca"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded rectangle background -->
+  <rect x="0" y="0" width="32" height="32" rx="6" ry="6" fill="url(#gradient)"/>
+  <!-- Bot icon (lucide-react Bot) -->
+  <g transform="translate(6, 6)" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Bot body/head -->
+    <rect x="3" y="6" width="14" height="11" rx="2"/>
+    <!-- Antenna -->
+    <path d="M10 6V3"/>
+    <circle cx="10" cy="2" r="1" fill="white"/>
+    <!-- Eyes -->
+    <circle cx="7" cy="11" r="1.5" fill="white"/>
+    <circle cx="13" cy="11" r="1.5" fill="white"/>
+    <!-- Ears/sides -->
+    <path d="M1 12v-2a1 1 0 0 1 1-1h1"/>
+    <path d="M19 12v-2a1 1 0 0 0-1-1h-1"/>
+    <!-- Mouth -->
+    <path d="M7 15h6"/>
+  </g>
+</svg>

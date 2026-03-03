@@ -1,0 +1,23 @@
+# Common dependencies for all AgentCore Runtime agents
+# These packages are pre-installed in the base image to speed up agent builds
+
+# AgentCore Runtime SDK (provides BedrockAgentCoreApp)
+bedrock-agentcore
+
+# Strands Agents SDK (core framework)
+strands-agents>=0.1.0
+
+# AWS SDK (required for all AWS services)
+boto3>=1.34.0
+
+# AWS Distro for OpenTelemetry (required for observability)
+aws-opentelemetry-distro>=0.10.0
+
+# Utilities
+python-json-logger>=2.0.0
+
+# MCP (Model Context Protocol) SDK (commonly used for Gateway integration)
+mcp>=1.0.0
+
+# AWS IAM authenticated MCP client (required for Gateway with IAM authentication)
+mcp-proxy-for-aws>=0.1.0
