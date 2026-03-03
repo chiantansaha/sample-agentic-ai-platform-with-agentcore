@@ -140,15 +140,15 @@ FLOW_STORAGE_BUCKET=agentic-ai-flow-storage-dev
 STATIC_ASSETS_BUCKET=agentic-ai-static-assets-dev
 
 # ECR Repository
-ECR_REPOSITORY_URI=801571645089.dkr.ecr.us-east-1.amazonaws.com/aws-agentic-ai-mcp-server-dev
+ECR_REPOSITORY_URI=<YOUR_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/aws-agentic-ai-mcp-server-dev
 
 # Bedrock Models
 DEFAULT_MODEL_ID=us.anthropic.claude-sonnet-4-0-v1:0
 CHAT_MODEL_ID=us.anthropic.claude-sonnet-4-0-v1:0
 
 # AgentCore Resource ARNs
-AGENTCORE_AGENT_ARN=arn:aws:bedrock-agentcore:us-east-1:801571645089:agent/xxx
-AGENTCORE_KNOWLEDGE_BASE_ARN=arn:aws:bedrock-agentcore:us-east-1:801571645089:knowledge-base/xxx
+AGENTCORE_AGENT_ARN=arn:aws:bedrock-agentcore:us-east-1:<YOUR_ACCOUNT_ID>:agent/xxx
+AGENTCORE_KNOWLEDGE_BASE_ARN=arn:aws:bedrock-agentcore:us-east-1:<YOUR_ACCOUNT_ID>:knowledge-base/xxx
 
 # Cognito (Optional - not needed if SKIP_AUTH=true)
 COGNITO_USER_POOL_ID=us-east-1_xxx
@@ -362,7 +362,7 @@ Now that your development environment is set up, explore these resources:
 
 ### Development Tasks
 
-- **MCP Server Development**: Add new MCP servers in the `mcps/` directory
+- **MCP Server Development**: Develop and deploy MCP servers independently via the platform's MCP Registry
 - **Flow Development**: Implement agent workflows using AgentCore
 - **API Development**: Add new endpoints in `apps/backend/app/api/routes/`
 - **UI Development**: Build React components in `apps/frontend/src/`

@@ -84,10 +84,6 @@ agentic-ai-platform/
 │       │   ├── stores/             # Zustand state stores
 │       │   └── main.tsx            # React entry point
 │       └── vite.config.ts
-├── mcps/                           # MCP server implementations
-│   ├── cost-explorer-mcp-server/
-│   ├── aws-network-mcp-server/
-│   └── amazon-bedrock-agentcore-mcp-server/
 ├── packages/                       # Shared code
 │   ├── api-client/                 # Axios HTTP client
 │   ├── shared-types/               # TypeScript types (auto-generated)
@@ -98,6 +94,8 @@ agentic-ai-platform/
 ├── docs/                           # Documentation
 └── package.json / pnpm-workspace.yaml
 ```
+
+Note: MCP servers are developed and deployed independently via the platform's MCP Registry, not included in this repository.
 
 ## Backend Development
 
@@ -364,7 +362,7 @@ Apply Tailwind classes directly to components:
 
 ## MCP Server Development
 
-Model Context Protocol (MCP) servers expose tools that agents can invoke. Implement using Anthropic's FastMCP SDK.
+Model Context Protocol (MCP) servers expose tools that agents can invoke. MCP servers are developed separately from this platform and deployed via the platform's MCP Registry. Implement using Anthropic's FastMCP SDK.
 
 ### Basic MCP Server Structure
 
@@ -443,7 +441,7 @@ def describe_resource(resource_id: str, detail_level: str = "basic") -> dict:
 Start the server:
 
 ```bash
-cd mcps/your-mcp-server
+cd your-mcp-server-directory
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -491,26 +489,28 @@ curl -X POST http://localhost:8000/mcp \
 ### Building and Pushing Docker Image
 
 ```bash
-cd mcps/your-mcp-server
+cd your-mcp-server-directory
 
 # CRITICAL: Build for arm64 (AgentCore Runtime requirement)
 docker build --platform linux/arm64 -t your-mcp-server:v1 .
 
 # Push to ECR
 aws ecr get-login-password --region us-east-1 | \
-  docker login --username AWS --password-stdin <ECR_URI>
+  docker login --username AWS --password-stdin <YOUR_ECR_URI>
 
-docker tag your-mcp-server:v1 <ECR_URI>/your-mcp-server:v1
-docker push <ECR_URI>/your-mcp-server:v1
+docker tag your-mcp-server:v1 <YOUR_ECR_URI>/your-mcp-server:v1
+docker push <YOUR_ECR_URI>/your-mcp-server:v1
 
 # Verify architecture
 aws ecr batch-get-image \
-  --repository-name your-repo \
+  --repository-name <YOUR_ECR_REPO_NAME> \
   --image-ids imageTag=v1 \
   --region us-east-1 \
   --query 'images[0].imageManifest' --output text | jq '.manifests[0].platform.architecture'
 # Should output: arm64
 ```
+
+Once built and pushed, register your MCP server via the platform's MCP Registry interface or API.
 
 **Important**: Building with `--platform linux/amd64` will cause AgentCore Runtime to reject the image with "Architecture incompatible" error.
 
@@ -626,15 +626,7 @@ python scripts/create_dynamodb_tables.py
 
 ### 3. Build and Push MCP Server
 
-```bash
-# Automates Docker build, tag, and ECR push
-scripts/build_and_push_mcp_server.sh <server-name> <image-tag>
-
-# Example:
-scripts/build_and_push_mcp_server.sh cost-explorer-mcp-server v1.0.0
-
-# Builds with arm64 (required for AgentCore Runtime)
-```
+MCP servers are built and deployed separately. Use standard Docker build commands with the `--platform linux/arm64` flag (required for AgentCore Runtime), then register via the platform's MCP Registry.
 
 ### 4. Export API Catalog
 

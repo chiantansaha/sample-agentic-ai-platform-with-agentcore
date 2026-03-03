@@ -89,7 +89,7 @@ Interactive development and testing environment:
 
 ### AI & Integration
 - **LLMs**: Amazon Bedrock (Claude, Nova)
-- **MCP Servers**: EKS MCP Server, Cost Explorer MCP Server, AWS Network MCP Server, Amazon Bedrock AgentCore MCP Server
+- **MCP Integration**: Model Context Protocol servers deployed and managed through the platform UI
 - **Search**: OpenSearch Serverless for vector and semantic search
 
 ## Project Structure
@@ -116,12 +116,6 @@ agentic-ai-platform/
 │       │   └── utils/                # Utility functions
 │       ├── public/                   # Static assets
 │       └── package.json              # Node dependencies
-│
-├── mcps/                             # MCP server implementations
-│   ├── eks-mcp-server/               # Kubernetes/EKS tools
-│   ├── cost-explorer-mcp-server/     # AWS Cost Explorer tools
-│   ├── aws-network-mcp-server/       # AWS networking tools
-│   └── amazon-bedrock-agentcore-mcp-server/ # AgentCore integration
 │
 ├── infra/                            # Infrastructure as Code (Terraform)
 │   ├── environments/
@@ -157,7 +151,6 @@ Before you begin, ensure you have the following installed:
 - **pnpm** (package manager for Node.js monorepo)
 - **AWS CLI** configured with appropriate credentials
 - **Terraform** 1.0 or higher (for infrastructure management)
-- **Docker** (for local MCP server testing)
 
 ## Getting Started
 
@@ -194,10 +187,7 @@ This command will:
 
 ### Project-Specific Configuration
 
-Refer to the project's [CLAUDE.md](./CLAUDE.md) for development environment setup specific to this codebase, including:
-- EKS MCP Server deployment procedures
-- OpenTelemetry observability configuration
-- Local testing procedures for MCP servers
+Refer to the project's [CLAUDE.md](./CLAUDE.md) for development environment setup specific to this codebase, including platform-specific development notes and configuration details.
 
 ## Deployment
 

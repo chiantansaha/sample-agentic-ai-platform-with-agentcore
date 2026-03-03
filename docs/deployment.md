@@ -463,7 +463,7 @@ docker build --platform linux/amd64 -t mcp-server:v1 .
 
 ### MCP Server Dockerfile Template
 
-**File**: `mcps/*/Dockerfile`
+**File**: `Dockerfile` (in your MCP server repository)
 
 ```dockerfile
 # Multi-stage build with uv for fast dependency installation
@@ -530,23 +530,22 @@ dependencies = [
 
 ```bash
 # 1. Build for ARM64 (REQUIRED for AgentCore Runtime)
-cd mcps/eks-mcp-server
+cd your-mcp-server-directory
 docker build --platform linux/arm64 -t eks-mcp-server:v4 .
 
 # 2. Tag for ECR
 docker tag eks-mcp-server:v4 \
-  801571645089.dkr.ecr.us-east-1.amazonaws.com/aws-agentic-ai-mcp-server-dev:eks-mcp-server-v4
+  <YOUR_ECR_URI>:eks-mcp-server-v4
 
 # 3. Get ECR login credentials
 ECR_PASSWORD=$(aws ecr get-login-password --region us-east-1)
-echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin \
-  801571645089.dkr.ecr.us-east-1.amazonaws.com
+echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin <YOUR_ECR_URI>
 
 # 4. Push to ECR
-docker push 801571645089.dkr.ecr.us-east-1.amazonaws.com/aws-agentic-ai-mcp-server-dev:eks-mcp-server-v4
+docker push <YOUR_ECR_URI>:eks-mcp-server-v4
 
 # 5. Verify architecture
-aws ecr batch-get-image --repository-name aws-agentic-ai-mcp-server-dev \
+aws ecr batch-get-image --repository-name <YOUR_ECR_REPO_NAME> \
   --image-ids imageTag=eks-mcp-server-v4 --region us-east-1 \
   --query 'images[0].imageManifest' --output text | jq -r '.manifests[0].platform.architecture'
 # Output should be: arm64
@@ -560,14 +559,14 @@ After building and pushing, register the MCP Server as a Gateway Target:
 # Create MCP Server Runtime
 aws bedrock-agentcore create-agent-runtime \
   --agent-runtime-name my-mcp-runtime \
-  --mcps-server-uri docker://801571645089.dkr.ecr.us-east-1.amazonaws.com/aws-agentic-ai-mcp-server-dev:eks-mcp-server-v4 \
+  --mcps-server-uri docker://<YOUR_ECR_URI>:eks-mcp-server-v4 \
   --region us-east-1
 
 # Create Gateway Target (connects MCP to Agent)
 aws bedrock-agentcore create-gateway-target \
   --agent-gateway-id <gateway-id> \
   --target-type mcpServer \
-  --mcp-server-uri docker://801571645089.dkr.ecr.us-east-1.amazonaws.com/aws-agentic-ai-mcp-server-dev:eks-mcp-server-v4 \
+  --mcp-server-uri docker://<YOUR_ECR_URI>:eks-mcp-server-v4 \
   --credential-provider-type OAUTH \
   --scopes mcp-api/read mcp-api/write mcp-api/invoke \
   --region us-east-1
