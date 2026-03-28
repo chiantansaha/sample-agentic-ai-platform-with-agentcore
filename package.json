@@ -4,7 +4,7 @@
   "private": true,
   "description": "Agentic AI Platform - Monorepo",
   "scripts": {
-    "predev": "cd apps/backend && python3 -m pip install -r requirements.txt",
+    "predev": "cd apps/backend && python3 -m pip install -r requirements.txt --break-system-packages",
     "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"bgBlue.bold,bgMagenta.bold\" \"pnpm dev:backend\" \"pnpm dev:frontend\"",
     "dev:frontend": "pnpm --filter frontend dev",
     "dev:backend": "cd apps/backend && ENV_MODE=development uvicorn app.main:app --reload --log-level debug",

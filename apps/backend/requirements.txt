@@ -16,7 +16,7 @@ opensearch-py==2.4.2
 # Database (for future use)
 sqlalchemy==2.0.36
 alembic==1.13.3
-asyncpg==0.30.0
+asyncpg==0.31.0
 
 # HTTP client
 httpx==0.28.1
@@ -33,7 +33,7 @@ python-dotenv==1.2.1  # Required by fastmcp>=1.1.0
 # MCP (Model Context Protocol) - pinned versions for compatibility
 mcp==1.22.0
 fastmcp==2.13.3
-mcp-proxy-for-aws==1.1.4
+mcp-proxy-for-aws==1.1.6
 
 # Strands Agents - pinned versions
 strands-agents==1.18.0
